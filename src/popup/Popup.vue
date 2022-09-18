@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import browser from 'webextension-polyfill'
-import { sendMessage } from 'webext-bridge'
+import { onMessage, sendMessage } from 'webext-bridge'
 import type tabData from '../types/tabData'
-import Toggle from '../components/Toggle.vue'
 import type Language from '../types/Language'
 import { getBrowserLanguage } from '../logic/detectLanguage'
+import { storageDemo } from '~/logic/storage'
 
-// const openOptionsPage = () => {
-//   browser.runtime.openOptionsPage()
-// }
-const voices = ref()
+interface ExtensionSettings {
+  speakWords: boolean
+  speakSentences: boolean
+  isExtensionActiveInAllTabs: boolean
+}
+
 const currentTabLanguage = ref<string>()
 const languageOptions = ref<Language[]>([
   { label: 'English', code: 'en' },
@@ -21,93 +21,75 @@ const languageOptions = ref<Language[]>([
   { label: 'Español', code: 'es' },
 ])
 const userLanguage = ref<string>('')
-
 const isActivatingOnPage = ref<boolean>(false)
 const activationSuccess = ref<boolean>(true)
-
-interface ExtensionSettings {
-  speakWords: boolean
-  speakSentences: boolean
-  isExtensionActiveInAllTabs: boolean
-}
-
 const extensionSettings = ref<ExtensionSettings>({
   speakWords: false,
   speakSentences: false,
   isExtensionActiveInAllTabs: false,
 })
-
 const currentActiveTab = ref<tabData>()
 const activeTabId = ref<number>()
-
 const isEnabled = computed(() => !!(currentActiveTab.value?.id === activeTabId.value && currentTabLanguage.value && userLanguage.value))
 
-watch([currentTabLanguage, userLanguage], (newValues, prevValues) => {
-  if (isEnabled.value) {
-    browser.runtime.sendMessage({
-      action: 'bg.tabSettings',
-      currentTabLanguage: newValues[0],
-      userLanguage: newValues[1] || '',
-    })
-    isActivatingOnPage.value = false
-    activationSuccess.value = true
-  }
-})
-
-function updateExtensionSettings() {
-  console.log('update')
-  browser.runtime.sendMessage({
-    action: 'bg.extensionSettings',
-    extensionSettings: extensionSettings.value,
-  })
+const updateExtensionSettings = async () => {
+  await sendMessage('bg.extensionSettings', {
+    data: {
+      extensionSettings: extensionSettings.value,
+    },
+  }, 'background')
 }
 
 const activateTranslations = async () => {
-  console.log('activateTranslations clicked...')
   await sendMessage('popup.activate', { sync: false }, 'background')
-  console.log('activateTranslations clicked2')
-
-  // browser.runtime.openOptionsPage()
   isActivatingOnPage.value = true
   activationSuccess.value = false
-  // await browser.runtime.sendMessage({
-  //   action: 'popup.activate',
-  // })
-  console.log('activateTranslations finished')
 }
 
-browser.runtime.onMessage.addListener(async (request) => {
-  console.log('popup request', request)
-  if (request.action === 'popup.activeTabs') {
-    currentActiveTab.value = request.currentActiveTab
-    activeTabId.value = request.activeTabId
-    currentTabLanguage.value = request?.currentActiveTab?.currentTabLanguage
-  }
-  if (request.activeTabId < 0)
+const refreshExtensionData = (data) => {
+  if (data.activeTabId < 0)
     throw new Error('Active Tab not identified')
 
-  if (request.extensionSettings)
-    extensionSettings.value = request.extensionSettings
+  if (data.extensionSettings)
+    extensionSettings.value = data.extensionSettings
+}
 
-  if (request.action === 'popup.activate.finished') {
-    currentTabLanguage.value = request.currentActiveTab.currentTabLanguage
-    activeTabId.value = request.activeTabId
-    currentActiveTab.value = request.currentActiveTab
-    isActivatingOnPage.value = false
-    activationSuccess.value = true
-  }
-  return true
+onMessage('popup.activeTabs', async ({ data }) => {
+  refreshExtensionData(data)
+  currentActiveTab.value = data.currentActiveTab
+  activeTabId.value = data.activeTabId
+  currentTabLanguage.value = data.currentActiveTab.currentTabLanguage
+})
+
+onMessage('popup.activate.finished', async ({ data }) => {
+  refreshExtensionData(data)
+  currentTabLanguage.value = data.currentActiveTab.currentTabLanguage
+  activeTabId.value = data.activeTabId
+  currentActiveTab.value = data.currentActiveTab
+  isActivatingOnPage.value = false
+  activationSuccess.value = true
+})
+
+watch([currentTabLanguage, userLanguage], async (newValues, prevValues) => {
+  // if (isEnabled.value) {
+  await sendMessage('bg.tabSettings', {
+    data: {
+      currentTabLanguage: newValues[0],
+      userLanguage: newValues[1] || '',
+    },
+  }, 'background')
+  isActivatingOnPage.value = false
+  activationSuccess.value = true
+  // }
 })
 
 onMounted(async () => {
-  await browser.runtime.sendMessage({
-    action: 'bg.activeTabs',
-  })
+  await sendMessage('bg.activeTabs', { data: { } }, 'background')
+
   if (!userLanguage.value) {
     const detectedUserLanguage = getBrowserLanguage()
     userLanguage.value = detectedUserLanguage || ''
   }
-  voices.value = window?.speechSynthesis?.getVoices()
 })
 </script>
 
@@ -133,25 +115,32 @@ onMounted(async () => {
       <div class="flex items center space-x-2">
         <p>Say Words</p>
       </div>
-      <Toggle :model-value="extensionSettings.speakWords" @update:model-value="extensionSettings.speakWords = $event"
-        @change="updateExtensionSettings()" />
+      <Toggle
+        :model-value="extensionSettings.speakWords" @update:model-value="extensionSettings.speakWords = $event"
+        @change="updateExtensionSettings()"
+      />
     </div>
     <div class="px-3 py-2 flex items-center justify-between">
       <div class="flex items center space-x-2">
         <p>Say Sentences</p>
       </div>
-      <Toggle :model-value="extensionSettings.speakSentences"
-        @update:model-value="extensionSettings.speakSentences = $event" @change="updateExtensionSettings()" />
+      <Toggle
+        :model-value="extensionSettings.speakSentences"
+        @update:model-value="extensionSettings.speakSentences = $event" @change="updateExtensionSettings()"
+      />
     </div>
     <div class="px-3 py-2 flex items-center justify-between">
       <div class="flex items center space-x-2">
         <p>Start Extension in all new Tabs</p>
       </div>
-      <Toggle :model-value="extensionSettings.isExtensionActiveInAllTabs"
+      <Toggle
+        :model-value="extensionSettings.isExtensionActiveInAllTabs"
         @update:model-value=" extensionSettings.isExtensionActiveInAllTabs = $event"
-        @change="updateExtensionSettings()" />
+        @change="updateExtensionSettings()"
+      />
     </div>
-    <button v-if="!isEnabled" class="
+    <button
+      v-if="!isEnabled" class="
         mt-5
         font-bold
         py-2
@@ -160,7 +149,8 @@ onMounted(async () => {
         text-white
       "
       :class="{ 'bg-yellow-500 hover:bg-yellow-700': !isEnabled, 'bg-green-500': isEnabled, 'bg-green-700': isActivatingOnPage }"
-      :disabled="isEnabled" @click="activateTranslations()">
+      :disabled="isEnabled" @click="activateTranslations()"
+    >
       <span v-if="!isEnabled && !isActivatingOnPage">Activate on this Tab</span>
       <span v-if="isActivatingOnPage && !isEnabled">
         <icon-park-outline:loading class="animate-spin block m-auto text-white text-lg" />

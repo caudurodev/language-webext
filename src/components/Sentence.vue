@@ -1,53 +1,3 @@
-<template>
-  <span v-if="hasWords" class="learnsentence" @mouseover="isMouseOverSentence=true"
-    @mouseout="isMouseOverSentence=false">
-    <span v-for="word in words" :key="word.id" style="display:inline-block; cursor:pointer;" :data-id="word.id"
-      :data-tag="word.tag" class="learnword">
-      <span v-if="word.isRange && showRangeFromWord(word.id, words)" :ref="(el:HTMLSpanElement) => {
-        if(el){ rangeTextTranslatedElements[word.id] = el }
-      }" style="color:#066965;" class="text-center block translation">
-        {{ word.rangeTextTranslated ?? '...' }}
-      </span>
-      <span v-if="word.isActive && !word.isRange" :ref="(el:HTMLSpanElement) => {
-        if(el){ translationTranslatedElements[word.id] = el }
-      }" class="translation" style="color:#066965; display:block">
-        {{ word.translation ?? '...' }}
-      </span>
-      <span v-if="!word.isRange" :ref="(el:HTMLSpanElement) => {
-        if(el){ singleWordElements[word.id] = el }
-      }" style="display:inline-block;" :style="word.isActive ? 'background-color:yellow' : ''"
-        @click="toggleWord(word.id, words)">
-        {{ word.text }}<span v-if="showEmptySpace(word.id, words)" v-html="'&nbsp'" />
-      </span>
-      <template v-if="word.isRange && showRangeFromWord(word.id,words)">
-        <span v-for="wordInRange in wordsInRange(word.id,words)" :key="wordInRange.id">
-          <span :ref="(el:HTMLSpanElement) => {
-            if(el){ rangeWordElements[wordInRange.id] = el}
-          }" style="background-color:yellow" @click="toggleWord(wordInRange.id, words)">
-            {{ wordInRange.text }}<span v-if="showEmptySpace(wordInRange.id, wordsInRange(word.id, words))"
-              v-html="'&nbsp'" />
-          </span>
-        </span>
-      </template>
-      <span v-if="word.isActive && word.href">
-        <a :href="word.href" target="_self"
-          class="clickthrough-link mx-2 bg-pink-500 text-white py-1 px-2 rounded border-none">
-          <icon-park:link-two class="m-auto text-xs" />
-        </a>
-      </span>
-    </span>
-    <span v-if="sentence[sentence.length-1] === '' " v-html="'&nbsp'" />
-  </span>
-  <span class="translatetools">
-    <button class="mx-2 bg-pink-500 text-white py-1 px-2 rounded border-none" @click="toggleSentenceTranslation()">
-      <ph:translate-bold />
-    </button>
-    <span v-if="isShowingSentenceTranslation" class="bg-pink-500 text-white inline">
-      {{ sentenceTranslation }}
-    </span>
-  </span>
-</template>
-
 <script lang="ts">
 import 'virtual:windi.css'
 import Tokenizer from 'wink-tokenizer'
@@ -124,7 +74,8 @@ export default defineComponent({
     })
 
     const rangeify = (activeWords?: Word[]): number[][] => {
-      if (!activeWords) return []
+      if (!activeWords)
+        return []
       const res = []
       let run = []
       for (let i = 0; i < activeWords.length; i++) {
@@ -141,7 +92,8 @@ export default defineComponent({
     }
 
     const getActiveWords = (words: Word[]): Word[] => {
-      if (!words) return []
+      if (!words)
+        return []
       return [...words.filter(w => w.isActive)]
     }
 
@@ -192,7 +144,8 @@ export default defineComponent({
         const isPrevWordLastInRange = wordIsLastRange(prevW?.id, words)
         if (isWordFirstInRange && activeWordRange && (w.id >= activeWordRange[0] && w.id <= activeWordRange[1]))
           translateString += ` <mark>${w.text}`
-        else if (isPrevWordLastInRange) translateString += `</mark> ${w.text}`
+        else if (isPrevWordLastInRange)
+          translateString += `</mark> ${w.text}`
         else if (!w.isRange && w.isActive && wordId === w.id)
           translateString += ` <mark>${w.text}`
         else if (!w.isActive && !prevW?.isRange && prevW?.isActive && wordId === prevW.id)
@@ -211,7 +164,8 @@ export default defineComponent({
       const ranges = rangeify(getActiveWords(words))
       let tempString = ''
       for (const r of ranges) {
-        if (r.length === 1) return
+        if (r.length === 1)
+          return
         tempString = ''
         for (let i = r[0]; i <= r[1]; i++) {
           tempString += `${words[i].text} `
@@ -235,20 +189,24 @@ export default defineComponent({
     }
 
     const showRangeFromWord = (wordId: number, words: Word[]) => {
-      if (wordIsLastRange(wordId, words)) return false
-      if (wordIsFirstInRange(wordId, words)) return true
+      if (wordIsLastRange(wordId, words))
+        return false
+      if (wordIsFirstInRange(wordId, words))
+        return true
       return false
     }
 
     const wordsInRange = (wordId: number, words: Word[]): Word[] => {
       const range = rangeify(getActiveWords(words)).find(r => r[0] >= wordId && wordId <= r[1])
-      if (!range || range.length === 1) return [] as Word[]
+      if (!range || range.length === 1)
+        return [] as Word[]
       return words.filter(w => w.id >= range[0] && w.id <= range[1]) as Word[]
     }
 
     const toggleWord = async (wordId: number, words: Word[]): Promise<void> => {
       const wordClicked = words[wordId]
-      if (!wordClicked) return
+      if (!wordClicked)
+        return
       wordClicked.isActive = !wordClicked.isActive
       if (words[wordId + 1]?.tag === 'punctuation')
         words[wordId + 1].isActive = wordClicked.isActive
@@ -332,7 +290,8 @@ export default defineComponent({
         if (wordId && Number(wordId) >= 0) {
           toggleWord(Number(wordId), words.value)
           const linkHref_1 = $(elFromPoints).closest('a').attr('href')
-          if (linkHref_1) words.value[Number(wordId)].href = linkHref_1
+          if (linkHref_1)
+            words.value[Number(wordId)].href = linkHref_1
         }
       }
       isMounted.value = true
@@ -371,5 +330,54 @@ export default defineComponent({
     }
   },
 })
-
 </script>
+
+<template>
+  <span v-if="hasWords" class="learnsentence" @mouseover="isMouseOverSentence = true"
+    @mouseout="isMouseOverSentence = false">
+    <span v-for="word in words" :key="word.id" style="display:inline-block; cursor:pointer;" :data-id="word.id"
+      :data-tag="word.tag" class="learnword">
+      <span v-if="word.isRange && showRangeFromWord(word.id, words)" :ref="(el:HTMLSpanElement) => {
+        if (el){ rangeTextTranslatedElements[word.id] = el }
+      }" style="color:#066965;" class="text-center block translation">
+        {{ word.rangeTextTranslated ?? '...' }}
+      </span>
+      <span v-if="word.isActive && !word.isRange" :ref="(el:HTMLSpanElement) => {
+        if (el){ translationTranslatedElements[word.id] = el }
+      }" class="translation" style="color:#066965; display:block">
+        {{ word.translation ?? '...' }}
+      </span>
+      <span v-if="!word.isRange" :ref="(el:HTMLSpanElement) => {
+        if (el){ singleWordElements[word.id] = el }
+      }" style="display:inline-block;" :style="word.isActive ? 'background-color:yellow' : ''"
+        @click="toggleWord(word.id, words)">
+        {{ word.text }}<span v-if="showEmptySpace(word.id, words)" v-html="'&nbsp'" />
+      </span>
+      <template v-if="word.isRange && showRangeFromWord(word.id, words)">
+        <span v-for="wordInRange in wordsInRange(word.id, words)" :key="wordInRange.id">
+          <span :ref="(el:HTMLSpanElement) => {
+            if (el){ rangeWordElements[wordInRange.id] = el }
+          }" style="background-color:yellow" @click="toggleWord(wordInRange.id, words)">
+            {{ wordInRange.text }}<span v-if="showEmptySpace(wordInRange.id, wordsInRange(word.id, words))"
+              v-html="'&nbsp'" />
+          </span>
+        </span>
+      </template>
+      <span v-if="word.isActive && word.href">
+        <a :href="word.href" target="_self"
+          class="clickthrough-link mx-2 bg-pink-500 text-white py-1 px-2 rounded border-none">
+          <icon-park:link-two class="m-auto text-xs" />
+        </a>
+      </span>
+    </span>
+    <span v-if="sentence[sentence.length - 1] === '' " v-html="'&nbsp'" />
+  </span>
+  <span class="translatetools">
+    <button class="mx-2 bg-pink-500 text-white py-1 px-2 rounded border-none" @click="toggleSentenceTranslation()">
+      <ph:translate-bold />
+    </button>
+    <span v-if="isShowingSentenceTranslation" class="bg-pink-500 text-white inline">
+      {{ sentenceTranslation }}
+    </span>
+  </span>
+</template>

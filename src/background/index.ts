@@ -6,23 +6,14 @@ import type tabData from '../types/tabData'
 if (__DEV__)
   import('./contentScriptHMR')
 
-browser.runtime.onInstalled.addListener((): void => {
-  // eslint-disable-next-line no-console
-  console.log('Extension installed')
-})
-
 let previousTabId = 0
 
-// communication example: send previous tab title from background page
-// see shim.d.ts for type declaration
 browser.tabs.onActivated.addListener(async ({ tabId }) => {
   if (!previousTabId) {
     previousTabId = tabId
     return
   }
-
   let tab: Tabs.Tab
-
   try {
     tab = await browser.tabs.get(previousTabId)
     previousTabId = tabId
@@ -30,24 +21,9 @@ browser.tabs.onActivated.addListener(async ({ tabId }) => {
   catch {
     return
   }
-
   // eslint-disable-next-line no-console
   console.log('previous tab', tab)
   sendMessage('tab-prev', { title: tab.title }, { context: 'content-script', tabId })
-})
-
-onMessage('get-current-tab', async () => {
-  try {
-    const tab = await browser.tabs.get(previousTabId)
-    return {
-      title: tab?.title,
-    }
-  }
-  catch {
-    return {
-      title: undefined,
-    }
-  }
 })
 
 let activeTabId = -1
@@ -128,69 +104,11 @@ function updateOpenTabsData(request: any): tabData[] {
   return activeTabs
 }
 
-const sendMessageToActiveTab = async (message: any): Promise<void> => {
-  browser.tabs
-    .query({ currentWindow: true, active: true })
-    .then(([tab]) => {
-      if (tab && tab.id)
-        browser.tabs.sendMessage(tab.id, message)
-    })
-    .catch(e => console.warn('message error', e))
-}
-
 function getCurrentActiveTab(): tabData | null {
   if (activeTabId === -1 || !activeTabs.length)
     return null
   return activeTabs.find(t => t.id === activeTabId) || null
 }
-
-browser.runtime.onMessage.addListener(async (request) => {
-  console.log('background received request', request)
-
-  if (activeTabId < 0)
-    throw new Error('currentActiveTab undefined, cannot continue.')
-
-  if (request.action === 'popup.activate') {
-    console.log('bg popup.activate start')
-    await injectExtensionInTab()
-    console.log('bg popup.activate end')
-  }
-  else if (request.action === 'bg.extensionSettings') {
-    extensionSettings = request.extensionSettings
-    await sendMessageToActiveTab({
-      action: 'content.settings',
-      activeTabId,
-      currentActiveTab: getCurrentActiveTab(),
-      extensionSettings,
-    })
-  }
-  else if (request.action === 'bg.tabSettings') {
-    updateOpenTabsData(request)
-    await sendMessageToActiveTab({
-      action: 'content.settings',
-      activeTabId,
-      currentActiveTab: getCurrentActiveTab(),
-      extensionSettings,
-    })
-  }
-  else if (request.action === 'bg.tab.ready') {
-    updateOpenTabsData(request)
-    await browser.runtime.sendMessage({
-      action: 'popup.activate.finished',
-      activeTabId,
-      currentActiveTab: getCurrentActiveTab(),
-      extensionSettings,
-    })
-  }
-  else if (request.action === 'bg.activeTabs') {
-    await browser.runtime.sendMessage({
-      action: 'popup.activeTabs',
-      currentActiveTab: getCurrentActiveTab(),
-      activeTabId,
-      extensionSettings,
-    })
-  }
-})
 
 // --- On Reloading, remove tabs from active ---
 browser.webNavigation.onCommitted.addListener((details) => {
@@ -211,11 +129,81 @@ browser.tabs.onActivated.addListener((tabId) => {
     })
 })
 
-// browser.runtime.onInstalled.addListener((): void => {
-//   // eslint-disable-next-line no-console
-//   console.log('Extension installed')
-// })
-
 onMessage('popup.activate', async () => {
   await injectExtensionInTab()
 })
+
+onMessage('get-current-tab', async () => {
+  try {
+    const tab = await browser.tabs.get(previousTabId)
+    return {
+      title: tab?.title,
+    }
+  }
+  catch {
+    return {
+      title: undefined,
+    }
+  }
+})
+
+onMessage('bg.activeTabs', async () => {
+  const currentActiveTab = await getCurrentActiveTab()
+  if (!currentActiveTab)
+    return
+  await sendMessage('popup.activeTabs', {
+    data: {
+      currentActiveTab,
+      activeTabId,
+      extensionSettings,
+    },
+  }, `popup@${activeTabId}`)
+})
+
+onMessage('bg.extensionSettings', async ({ data }) => {
+  console.log('bg.extensionSettings', data)
+  extensionSettings = data.extensionSettings
+  const currentActiveTab = await getCurrentActiveTab()
+  if (!currentActiveTab)
+    return
+  await sendMessage('content.settings', {
+    data: {
+      currentActiveTab,
+      activeTabId,
+      extensionSettings,
+    },
+  },
+  `content-script@${activeTabId}`)
+})
+
+onMessage('bg.tabSettings', async ({ data }) => {
+  console.log('bg.tabSettings', data)
+  const currentActiveTab = await getCurrentActiveTab()
+  if (!currentActiveTab)
+    return
+  updateOpenTabsData(data)
+  await sendMessage('content.settings', {
+    data: {
+      currentActiveTab,
+      activeTabId,
+      extensionSettings,
+    },
+  },
+  `content-script@${activeTabId}`)
+})
+
+onMessage('bg.tab.ready', async ({ data }) => {
+  const currentActiveTab = await getCurrentActiveTab()
+  if (!currentActiveTab)
+    return
+  updateOpenTabsData(data)
+  await sendMessage('popup.activate.finished', {
+    data: {
+      currentActiveTab,
+      activeTabId,
+      extensionSettings,
+    },
+  },
+  `popup@${activeTabId}`)
+})
+

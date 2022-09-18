@@ -2,13 +2,14 @@
 import { createApp, ref } from 'vue'
 import $ from 'jquery'
 import Mark from 'mark.js'
-import browser from 'webextension-polyfill'
 import 'virtual:windi.css'
 import tokenizer from 'sbd'
+import { onMessage, sendMessage } from 'webext-bridge'
 
 import getLanguageDefaults from '../../logic/detectLanguage'
 import Sentence from '../../components/Sentence.vue'
 import { WordUnderCursor } from '../../logic/hover'
+import { storageDemo } from '~/logic/storage'
 
 const showExtension = ref(false)
 const isRedirecting = ref(false)
@@ -146,17 +147,15 @@ function trackContentClicks() {
   })
 }
 
-browser.runtime.onMessage.addListener(async (request) => {
-  console.log('content listener received', request)
-  if (request.action === 'content.settings') {
-    userLanguage.value = request?.currentActiveTab?.userLanguage || ''
-    currentTabLanguage.value = request?.currentActiveTab?.currentTabLanguage || ''
-    speakWords.value = request?.extensionSettings?.speakWords || false
-    speakSentences.value = request?.extensionSettings?.speakSentences || false
-  }
+onMessage('content.settings', async ({ data }) => {
+  userLanguage.value = data?.currentActiveTab?.userLanguage || ''
+  currentTabLanguage.value = data?.currentActiveTab?.currentTabLanguage || ''
+  speakWords.value = data?.extensionSettings?.speakWords || false
+  speakSentences.value = data?.extensionSettings?.speakSentences || false
 })
 
 onMounted(async () => {
+  console.log('mounted', storageDemo.value)
   trackContentClicks()
   // trackContentMouseOver()
   try {
@@ -167,11 +166,12 @@ onMounted(async () => {
   catch (e: any) {
     console.warn('error getLanguageDefaults', e?.message)
   }
-  await browser.runtime.sendMessage({
-    action: 'bg.tab.ready',
-    userLanguage: userLanguage.value || '',
-    currentTabLanguage: currentTabLanguage.value || '',
-  })
+  await sendMessage('bg.tab.ready', {
+    data: {
+      userLanguage: userLanguage.value || '',
+      currentTabLanguage: currentTabLanguage.value || '',
+    },
+  }, 'background')
 })
 </script>
 
