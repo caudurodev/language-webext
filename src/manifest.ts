@@ -33,15 +33,20 @@ export async function getManifest() {
       'tabs',
       'storage',
       'activeTab',
+      'http://*/',
+      'https://*/',
+      '*://*/*',
+      '<all_urls>',
       // 'webNavigation',
     ],
     host_permissions: ['*://*/*'],
-    content_scripts: [
-      {
-        matches: ['http://*/*', 'https://*/*'],
-        js: ['./dist/contentScripts/index.global.js'],
-      },
-    ],
+    // don't inject - let popup do this
+    // content_scripts: [
+    //   {
+    //     matches: ['http://*/*', 'https://*/*'],
+    //     js: ['./dist/contentScripts/index.global.js'],
+    //   },
+    // ],
     web_accessible_resources: [
       {
         resources: ['dist/contentScripts/style.css'],
@@ -62,6 +67,7 @@ export async function getManifest() {
     // see src/background/contentScriptHMR.ts
     delete manifest.content_scripts
     manifest.permissions?.push('scripting', 'webNavigation')
+    // manifest.content_security_policy = `script-src \'self\' http://localhost:${port}; object-src \'self\'`
   }
 
   return manifest

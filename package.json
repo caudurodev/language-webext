@@ -1,6 +1,6 @@
 {
-  "name": "vitesse-webext",
-  "displayName": "Vitesse WebExt",
+  "name": "language-webext",
+  "displayName": "Language WebExt",
   "version": "0.0.1",
   "description": "[description]",
   "private": true,
@@ -62,6 +62,10 @@
     "webextension-polyfill": "^0.9.0"
   },
   "dependencies": {
-    "@nodelib/fs.scandir": "^2.1.5"
+    "@nodelib/fs.scandir": "^2.1.5",
+    "jquery": "^3.6.1",
+    "mark.js": "^8.11.1",
+    "sbd": "^1.0.19",
+    "wink-tokenizer": "^5.3.0"
   }
 }
