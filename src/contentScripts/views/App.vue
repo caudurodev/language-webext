@@ -7,17 +7,16 @@ import tokenizer from 'sbd'
 import { onMessage, sendMessage } from 'webext-bridge'
 
 import getLanguageDefaults from '../../logic/detectLanguage'
+
 import Sentence from '../../components/Sentence.vue'
 import { WordUnderCursor } from '../../logic/hover'
-import { storageDemo } from '~/logic/storage'
+import { extensionSettingsStorage, tabsInfoStorage } from '~/logic/storage'
 
 const showExtension = ref(false)
 const isRedirecting = ref(false)
 const isEnabled = ref(false)
 const currentTabLanguage = ref('')
 const userLanguage = ref<string>('')
-const speakWords = ref<boolean>(false)
-const speakSentences = ref<boolean>(false)
 
 const getFullSentence = (e: JQuery.TriggeredEvent) => {
   let str = ''
@@ -67,18 +66,7 @@ const getFullSentence = (e: JQuery.TriggeredEvent) => {
   return {}
 }
 
-// function trackContentMouseOver() {
-//   $(document.body).on('mousemove', (e) => {
-//     if (
-//       $(e.target).is('body, wordwrap, .learnword, .translatetools')
-//     || !!$(e.target).closest('wordwrap, .learnword, .translatetools').length
-//     )
-//       return
-//     const { clicked, x, y } = getFullSentence(e)
-//   })
-// }
-
-function trackContentClicks() {
+const trackContentClicks = () => {
   $(document.body).on('click', (e: JQuery.TriggeredEvent) => {
     if (isRedirecting.value)
       return
@@ -89,13 +77,6 @@ function trackContentClicks() {
       console.log('ignore click....')
       return
     }
-    // if (!$(e.target).text() && ($(e.target).find('a').length || $(e.target).closest('a').length)) {
-    //   isRedirecting.value = true
-    //   if ($(e.target).find('a').length) $(e.target).find('a')[0].click()
-    //   if ($(e.target).closest('a').length) $(e.target).closest('a')[0].click()
-    //   console.log('redirecting click')
-    //   return false
-    // }
 
     const { word } = WordUnderCursor.getFullWord(e)
     if (!word)
@@ -135,8 +116,8 @@ function trackContentClicks() {
                   y,
                   currentTabLanguage: currentTabLanguage.value,
                   userLanguage: userLanguage.value,
-                  speakWords: speakWords.value,
-                  speakSentences: speakSentences.value,
+                  speakWords: false,
+                  speakSentences: false,
                 }, context),
               }
             },
@@ -147,36 +128,49 @@ function trackContentClicks() {
   })
 }
 
+const addTabToStorage = async () => {
+  const tab = await sendMessage('get-current-tab', {}, 'background')
+  if (tabsInfoStorage.value.tabs.find(t => t.id === tab.id) || !tab)
+    return
+  tabsInfoStorage.value.tabs.push({
+    id: tab.id,
+    language: currentTabLanguage.value,
+  })
+
+  console.log('tabsInfoStorage.value', tabsInfoStorage.value)
+}
+
 onMessage('content.settings', async ({ data }) => {
   userLanguage.value = data?.currentActiveTab?.userLanguage || ''
   currentTabLanguage.value = data?.currentActiveTab?.currentTabLanguage || ''
-  speakWords.value = data?.extensionSettings?.speakWords || false
-  speakSentences.value = data?.extensionSettings?.speakSentences || false
 })
 
 onMounted(async () => {
-  console.log('mounted', storageDemo.value)
-  trackContentClicks()
-  // trackContentMouseOver()
+  console.log('extensionSettingsStorage:', extensionSettingsStorage.value)
   try {
+    trackContentClicks()
     const { currentTabLanguage: initialCurrentTabLanguage, userLanguage: initialUserLanguage } = await getLanguageDefaults()
     userLanguage.value = initialUserLanguage || ''
     currentTabLanguage.value = initialCurrentTabLanguage || ''
+    await sendMessage('bg.tab.ready', {
+      data: {
+        userLanguage: userLanguage.value || '',
+        currentTabLanguage: currentTabLanguage.value || '',
+      },
+    }, 'background')
+    addTabToStorage()
+    console.log('great success!')
   }
   catch (e: any) {
-    console.warn('error getLanguageDefaults', e?.message)
+    console.error('error getLanguageDefaults', e?.message)
   }
-  await sendMessage('bg.tab.ready', {
-    data: {
-      userLanguage: userLanguage.value || '',
-      currentTabLanguage: currentTabLanguage.value || '',
-    },
-  }, 'background')
 })
 </script>
 
 <template>
-  <div />
+  <div class="bg-red-500 text-white py-4 z-50 top-0 left-0">
+    extensionSettingsStorage: {{ extensionSettingsStorage }}
+  </div>
 </template>
 
 <style src="../../styles/fonts.css">

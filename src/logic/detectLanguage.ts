@@ -16,7 +16,8 @@ const detectLanguage = async () => {
   let pageText = ''
   $(document.body).children(':visible').find('p,a,h1,h2').each((i, el) => {
     const text = $(el).text()
-    if (text && text.split(' ').length > 4 && pageText.length < 500) pageText += ` ${text}`
+    if (text && text.split(' ').length > 4 && pageText.length < 500)
+      pageText += ` ${text}`
   })
   // console.log('pageText', pageText)
 
@@ -64,7 +65,7 @@ const getBrowserLanguage = (): string => {
   const browserLanguage = languageOptions.filter(l =>
     navigator.language.includes(l.code),
   )
-  return browserLanguage.length ? browserLanguage[0].code : ''
+  return browserLanguage.length ? browserLanguage[0].code : 'en'
 }
 
 const getLanguageDefaults = async () => {
@@ -72,7 +73,8 @@ const getLanguageDefaults = async () => {
   const currentTabLanguage = detectLanguageResult.language
   const userLanguage = getBrowserLanguage()
 
-  if (userLanguage && currentTabLanguage) return { userLanguage, currentTabLanguage }
+  if (userLanguage && currentTabLanguage)
+    return { userLanguage, currentTabLanguage }
   throw new Error('could not identify language defaults')
 }
 
