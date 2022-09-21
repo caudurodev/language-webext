@@ -4,19 +4,17 @@ import $ from 'jquery'
 import Mark from 'mark.js'
 import 'virtual:windi.css'
 import tokenizer from 'sbd'
-import { onMessage, sendMessage } from 'webext-bridge'
+import { onMessage } from 'webext-bridge'
 
 import getLanguageDefaults from '../../logic/detectLanguage'
-
-import Sentence from '../../components/Sentence.vue'
 import { WordUnderCursor } from '../../logic/hover'
-import { extensionSettingsStorage, tabsInfoStorage } from '~/logic/storage'
+import Sentence from '~/components/Sentence.vue'
 
-const showExtension = ref(false)
 const isRedirecting = ref(false)
 const isEnabled = ref(false)
 const currentTabLanguage = ref('')
 const userLanguage = ref<string>('')
+const extensionSharedStorage = ref()
 
 const getFullSentence = (e: JQuery.TriggeredEvent) => {
   let str = ''
@@ -68,6 +66,13 @@ const getFullSentence = (e: JQuery.TriggeredEvent) => {
 
 const trackContentClicks = () => {
   $(document.body).on('click', (e: JQuery.TriggeredEvent) => {
+    if (!isEnabled.value) {
+      console.log('stop click as disabled')
+      return
+    }
+    else {
+      console.log('allow click as enabled')
+    }
     if (isRedirecting.value)
       return
     if (
@@ -84,11 +89,6 @@ const trackContentClicks = () => {
 
     if (!$(e.target).closest('body')[0])
       return // removed from DOM
-
-    if (isEnabled.value)
-      isEnabled.value = true
-    if (showExtension.value)
-      showExtension.value = true
 
     const isWrappedSentence = !!$(e.target).closest('sentencewrap').length // sentence already wrapped
     if (!isWrappedSentence) {
@@ -128,55 +128,48 @@ const trackContentClicks = () => {
   })
 }
 
-const addTabToStorage = async () => {
-  const tab = await sendMessage('get-current-tab', {}, 'background')
-  if (tabsInfoStorage.value.tabs.find(t => t.id === tab.id) || !tab)
-    return
-  tabsInfoStorage.value.tabs.push({
-    id: tab.id,
-    language: currentTabLanguage.value,
-  })
+watch(isEnabled, (newVal) => {
+  console.log('isEnabled:', newVal)
+})
 
-  console.log('tabsInfoStorage.value', tabsInfoStorage.value)
-}
+onMessage('content.storage', async ({ data }) => {
+  console.log('received content.storage', data)
+  // updates from popup
+  extensionSharedStorage.value = data
+})
 
-onMessage('content.settings', async ({ data }) => {
-  userLanguage.value = data?.currentActiveTab?.userLanguage || ''
-  currentTabLanguage.value = data?.currentActiveTab?.currentTabLanguage || ''
+onMessage('content.info', async () => {
+  return { language: currentTabLanguage.value, isEnabled: isEnabled.value }
+})
+
+onMessage('content.isEnabled', async ({ data }) => {
+  console.log('content.isEnabled', data)
+  isEnabled.value = data.isEnabled
+  if (!isEnabled.value) {
+    // good place to reload
+    //
+  }
 })
 
 onMounted(async () => {
-  console.log('extensionSettingsStorage:', extensionSettingsStorage.value)
   try {
+    const { currentTabLanguage: language } = await getLanguageDefaults()
+    if (language)
+      currentTabLanguage.value = language
+    console.log('currentTabLanguage.value', currentTabLanguage.value)
     trackContentClicks()
-    const { currentTabLanguage: initialCurrentTabLanguage, userLanguage: initialUserLanguage } = await getLanguageDefaults()
-    userLanguage.value = initialUserLanguage || ''
-    currentTabLanguage.value = initialCurrentTabLanguage || ''
-    await sendMessage('bg.tab.ready', {
-      data: {
-        userLanguage: userLanguage.value || '',
-        currentTabLanguage: currentTabLanguage.value || '',
-      },
-    }, 'background')
-    addTabToStorage()
     console.log('great success!')
   }
   catch (e: any) {
-    console.error('error getLanguageDefaults', e?.message)
+    console.error('error mount', e)
   }
 })
 </script>
 
 <template>
-  <div class="bg-red-500 text-white py-4 z-50 top-0 left-0">
-    extensionSettingsStorage: {{ extensionSettingsStorage }}
-  </div>
+  <div />
 </template>
 
-<style src="../../styles/fonts.css">
+<style src="../../styles/fonts.css" />
 
-</style>
-
-<style src="../../styles/content.css">
-
-</style>
+<style src="../../styles/content.css" />

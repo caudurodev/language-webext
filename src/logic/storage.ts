@@ -16,9 +16,9 @@ export const userStorage = useStorageLocal('userStorage', {
 
 export interface TabInfo {
   id: number
-  language: string
+  isEnabled: boolean
 }
 
 export const tabsInfoStorage = useStorageLocal('tabsInfoStorage',
-  { tabs: <TabInfo[]>[] }, { listenToStorageChanges: true })
+  <TabInfo[]>[], { listenToStorageChanges: true })
 

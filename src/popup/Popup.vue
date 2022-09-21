@@ -1,25 +1,11 @@
 <script setup lang="ts">
-import { onMessage, sendMessage } from 'webext-bridge'
+import { sendMessage } from 'webext-bridge'
 import type Language from '../types/Language'
-import { getCurrentBrowserTabId } from '~/logic/browserTabs'
 import { extensionSettingsStorage, tabsInfoStorage, userStorage } from '~/logic/storage'
 
-const currentActiveTabId = ref<number>()
-
-const currentActiveTab = computed(() => {
-  if (currentActiveTabId.value && tabsInfoStorage.value.tabs.length > 0) {
-    const tabs = tabsInfoStorage.value.tabs.filter(t => t.id === currentActiveTabId.value)
-    if (tabs.length > 0)
-      return tabs[0]
-  }
-  return null
-})
-
-const tabLanguage = computed(() => {
-  if (!currentActiveTab.value)
-    return ''
-  return currentActiveTab.value.language
-})
+const tabLanguage = ref('')
+const isCurrentTabEnabled = ref(false)
+const currentTabId = ref<number>()
 
 const languageOptions = ref<Language[]>([
   { label: 'English', code: 'en' },
@@ -29,32 +15,57 @@ const languageOptions = ref<Language[]>([
   { label: 'Français', code: 'fr' },
   { label: 'Español', code: 'es' },
 ])
-const isActivatingOnPage = ref<boolean>(false)
-const activationSuccess = ref<boolean>(true)
-const isTabEnabled = computed(async () => {
-  return !currentActiveTab.value
-})
 
-const activateTranslations = async () => {
-  await sendMessage('popup.activate', { sync: false }, 'background')
-  isActivatingOnPage.value = true
-  activationSuccess.value = false
+const findActiveTab = () => {
+  const activeTab = tabsInfoStorage.value.find(t => t.id === currentTabId.value)
+  if (activeTab)
+    return activeTab
+  return null
 }
 
-// onMessage('popup.setActiveTabId', async ({ data }) => {
-//   console.log('should fire on mounted each time popup.setActiveTabId', data)
-// })
+const storeActiveTab = () => {
+  if (!currentTabId.value)
+    return
 
-// onMessage('popup.activeTabs', async ({ data }) => {
-// })
+  if (findActiveTab())
+    tabsInfoStorage.value = tabsInfoStorage.value.filter(t => t.id !== currentTabId.value)
+  tabsInfoStorage.value.push({
+    id: currentTabId.value,
+    isEnabled: isCurrentTabEnabled.value,
+  })
+}
+watch(isCurrentTabEnabled, async (newVal) => {
+  console.log('isCurrentTabEnabled', newVal)
+  storeActiveTab()
+  const activeTab = findActiveTab()
+  console.log('activeTab', activeTab)
+  console.log('isCurrentTabEnabled.value', isCurrentTabEnabled.value)
+  console.log('tabsInfoStorage.value', tabsInfoStorage.value)
+  await sendMessage('bg.isCurrentTabEnabled', { isEnabled: newVal }, 'background')
+})
 
-// onMessage('popup.activate.finished', async ({ data }) => {
-//   isActivatingOnPage.value = false
-//   activationSuccess.value = true
-// })
+watch([extensionSettingsStorage, userStorage], async () => {
+  await sendMessage('bg.storage', {
+    extensionSettingsStorage: extensionSettingsStorage.value,
+    userStorage: userStorage.value,
+  }, 'background')
+}, { deep: true })
 
 onMounted(async () => {
-  currentActiveTabId.value = await getCurrentBrowserTabId()
+  console.log('tabsInfoStorage.value.tabs on mounted', tabsInfoStorage.value)
+  currentTabId.value = await sendMessage('bg.getCurrentActiveTabId', {}, 'background')
+  console.log('currentTabId.value', currentTabId.value)
+  storeActiveTab()
+  await sendMessage('bg.storage', {
+    extensionSettingsStorage: extensionSettingsStorage.value,
+    userStorage: userStorage.value,
+  }, 'background')
+  // check if enabled from storage
+  const activeTab = findActiveTab()
+  console.log('activeTab is', activeTab?.isEnabled)
+  if (activeTab)
+    isCurrentTabEnabled.value = activeTab.isEnabled
+  console.log('isCurrentTabEnabled.value', isCurrentTabEnabled.value)
 })
 </script>
 
@@ -106,37 +117,24 @@ onMounted(async () => {
       </div>
       <Toggle
         :model-value="extensionSettingsStorage.isExtensionActiveInAllTabs"
-        @update:model-value=" extensionSettingsStorage.isExtensionActiveInAllTabs = $event"
+        @update:model-value="extensionSettingsStorage.isExtensionActiveInAllTabs = $event"
       />
     </div>
-    <button
-      v-if="!isTabEnabled" class="
-        mt-5
-        font-bold
-        py-2
-        px-4
-        rounded
-        text-white
-      "
-      :class="{
-        'bg-yellow-500 hover:bg-yellow-700': !isTabEnabled,
-        'bg-green-500': isTabEnabled,
-        'bg-green-700': isActivatingOnPage,
-      }"
-      :disabled="isTabEnabled" @click="activateTranslations()"
-    >
-      <span v-if="!isTabEnabled && !isActivatingOnPage">Activate on this Tab</span>
-      <span v-if="isActivatingOnPage && !isTabEnabled">
-        <icon-park-outline:loading class="animate-spin block m-auto text-white text-lg" />
-      </span>
-      <span v-if="activationSuccess && isTabEnabled">
-        Done.
-        <icon-park-outline:check class="block m-auto text-green text-lg" />
-      </span>
-      <span v-if="!activationSuccess && isTabEnabled">Error</span>
-    </button>
-    currentActiveTabId: {{ currentActiveTabId }}
-    currentActiveTab:{{ currentActiveTab }}
-    userStorage: {{ userStorage.language }}
+    <div class="px-3 py-2 flex items-center justify-between">
+      <div class="flex items center space-x-2">
+        <p>Active in current tab</p>
+      </div>
+      <Toggle
+        :model-value="isCurrentTabEnabled"
+        @update:model-value="isCurrentTabEnabled = $event"
+      />
+    </div>
+    <div py-4 mb-4 block bg-green-400>
+      aaaextensionSettingsStorage: {{ extensionSettingsStorage }}
+    </div>
+    <br><br>
+    <div py-4>
+      isCurrentTabEnabled: {{ isCurrentTabEnabled }}
+    </div>
   </main>
 </template>

@@ -33,20 +33,22 @@ export async function getManifest() {
       'tabs',
       'storage',
       'activeTab',
-      'http://*/',
-      'https://*/',
-      '*://*/*',
-      '<all_urls>',
+      'scripting',
+      'webNavigation',
+      // 'http://*/',
+      // 'https://*/',
+      // '*://*/*',
+      // '<all_urls>',
       // 'webNavigation',
     ],
     host_permissions: ['*://*/*'],
-    // don't inject - let popup do this
-    // content_scripts: [
-    //   {
-    //     matches: ['http://*/*', 'https://*/*'],
-    //     js: ['./dist/contentScripts/index.global.js'],
-    //   },
-    // ],
+    content_scripts: [
+      {
+        matches: ['http://*/*', 'https://*/*'],
+        js: ['./dist/contentScripts/index.global.js'],
+        css: ['./dist/contentScripts/style.css'],
+      },
+    ],
     web_accessible_resources: [
       {
         resources: ['dist/contentScripts/style.css'],
@@ -61,14 +63,14 @@ export async function getManifest() {
     },
   }
 
-  if (isDev) {
-    // for content script, as browsers will cache them for each reload,
-    // we use a background script to always inject the latest version
-    // see src/background/contentScriptHMR.ts
-    delete manifest.content_scripts
-    manifest.permissions?.push('scripting', 'webNavigation')
-    // manifest.content_security_policy = `script-src \'self\' http://localhost:${port}; object-src \'self\'`
-  }
+  // if (isDev) {
+  // for content script, as browsers will cache them for each reload,
+  // we use a background script to always inject the latest version
+  // see src/background/contentScriptHMR.ts
+  // delete manifest.content_scripts
+  // manifest.permissions?.push('scripting', 'webNavigation')
+  // manifest.content_security_policy = `script-src \'self\' http://localhost:${port}; object-src \'self\'`
+  // }
 
   return manifest
 }

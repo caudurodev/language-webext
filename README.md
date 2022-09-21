@@ -1,4 +1,9 @@
 
+## Design
+
+Extension local storage is controlled amd synced in the options popup. 
+
+
 ### Development
 
 ```bash

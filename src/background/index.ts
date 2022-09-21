@@ -7,6 +7,8 @@ import { getCurrentBrowserTabId } from '~/logic/browserTabs'
 if (__DEV__)
   import('./contentScriptHMR')
 
+// Stored in memory
+
 let previousTabId = 0
 
 browser.tabs.onActivated.addListener(async ({ tabId }) => {
@@ -36,7 +38,7 @@ interface ExtensionSettings {
   isExtensionActiveInAllTabs: boolean
 }
 
-let extensionSettings: ExtensionSettings = {
+const extensionSettings: ExtensionSettings = {
   speakWords: false,
   speakSentences: false,
   isExtensionActiveInAllTabs: false,
@@ -134,12 +136,26 @@ browser.tabs.onActivated.addListener((tabId) => {
     })
 })
 
-onMessage('popup.activate', async () => {
-  await injectExtensionInTab()
+onMessage('bg.isCurrentTabEnabled', async ({ data }) => {
+  await sendMessage('content.isEnabled', data, `content-script@${activeTabId}`)
 })
 
-onMessage('get-current-tab', async () => {
-  return await browser.tabs.get(previousTabId)
+// onMessage('popup.activate', async () => {
+//   await injectExtensionInTab()
+// })
+
+onMessage('bg.storage', async ({ data }) => {
+  await sendMessage('content.storage', { data }, `content-script@${activeTabId}`)
+})
+
+onMessage('bg.getCurrentTabInfo', async () => {
+  const tab = await browser.tabs.get(previousTabId)
+  const tabInfo = await sendMessage('content.info', {}, `content-script@${activeTabId}`)
+  return { tab, tabInfo }
+})
+
+onMessage('bg.getCurrentActiveTabId', async () => {
+  return previousTabId
 })
 
 onMessage('bg.getActiveTabId', async () => {
@@ -152,50 +168,50 @@ onMessage('bg.getActiveTabId', async () => {
   await sendMessage('popup.setActiveTabId', { data: { activeTabId: previousTabId } }, 'popup')
 })
 
-onMessage('bg.activeTabs', async () => {
-  const currentActiveTab = await getCurrentActiveTab()
-  if (!currentActiveTab)
-    return
-  await sendMessage('popup.activeTabs', {
-    data: {
-      currentActiveTab,
-      activeTabId,
-      extensionSettings,
-    },
-  }, `popup@${activeTabId}`)
-})
+// onMessage('bg.activeTabs', async () => {
+//   const currentActiveTab = await getCurrentActiveTab()
+//   if (!currentActiveTab)
+//     return
+//   await sendMessage('popup.activeTabs', {
+//     data: {
+//       currentActiveTab,
+//       activeTabId,
+//       extensionSettings,
+//     },
+//   }, `popup@${activeTabId}`)
+// })
 
-onMessage('bg.extensionSettings', async ({ data }) => {
-  console.log('bg.extensionSettings', data)
-  extensionSettings = data.extensionSettings
-  const currentActiveTab = await getCurrentActiveTab()
-  if (!currentActiveTab)
-    return
-  await sendMessage('content.settings', {
-    data: {
-      currentActiveTab,
-      activeTabId,
-      extensionSettings,
-    },
-  },
-  `content-script@${activeTabId}`)
-})
+// onMessage('bg.extensionSettings', async ({ data }) => {
+//   console.log('bg.extensionSettings', data)
+//   extensionSettings = data.extensionSettings
+//   const currentActiveTab = await getCurrentActiveTab()
+//   if (!currentActiveTab)
+//     return
+//   await sendMessage('content.settings', {
+//     data: {
+//       currentActiveTab,
+//       activeTabId,
+//       extensionSettings,
+//     },
+//   },
+//   `content-script@${activeTabId}`)
+// })
 
-onMessage('bg.tabSettings', async ({ data }) => {
-  console.log('bg.tabSettings', data)
-  const currentActiveTab = await getCurrentActiveTab()
-  if (!currentActiveTab)
-    return
-  updateOpenTabsData(data)
-  await sendMessage('content.settings', {
-    data: {
-      currentActiveTab,
-      activeTabId,
-      extensionSettings,
-    },
-  },
-  `content-script@${activeTabId}`)
-})
+// onMessage('bg.tabSettings', async ({ data }) => {
+//   console.log('bg.tabSettings', data)
+//   const currentActiveTab = await getCurrentActiveTab()
+//   if (!currentActiveTab)
+//     return
+//   updateOpenTabsData(data)
+//   await sendMessage('content.settings', {
+//     data: {
+//       currentActiveTab,
+//       activeTabId,
+//       extensionSettings,
+//     },
+//   },
+//   `content-script@${activeTabId}`)
+// })
 
 onMessage('bg.tab.ready', async ({ data }) => {
   console.log('bg.tab.ready received in bg', data)
