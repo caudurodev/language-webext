@@ -13,13 +13,13 @@ import Sentence from '~/components/Sentence.vue'
 const isRedirecting = ref(false)
 const isEnabled = ref(false)
 const currentTabLanguage = ref('')
-const userLanguage = ref<string>('')
+const userLanguage = ref('')
 const extensionSharedStorage = ref()
 
 const getFullSentence = (e: JQuery.TriggeredEvent) => {
   let str = ''
   let useParent = false
-  if ($(e.target).is('a,i,b') && $(e.target).parent().is('p,h1,h2,h3')) {
+  if ($(e.target).is('a,i,b') && $(e.target).parent().is('p,h1,h2,h3,h4,h5,h6')) {
     str = $(e.target).parent().text()
     useParent = true
   }
@@ -64,15 +64,9 @@ const getFullSentence = (e: JQuery.TriggeredEvent) => {
   return {}
 }
 
-const trackContentClicks = () => {
+const enableContentClickProxy = () => {
+  $(document.body).addClass('languageextensioncss')
   $(document.body).on('click', (e: JQuery.TriggeredEvent) => {
-    if (!isEnabled.value) {
-      console.log('stop click as disabled')
-      return
-    }
-    else {
-      console.log('allow click as enabled')
-    }
     if (isRedirecting.value)
       return
     if (
@@ -82,15 +76,14 @@ const trackContentClicks = () => {
       console.log('ignore click....')
       return
     }
+    if (!$(e.target).closest('body')[0])
+      return // removed from DOM
 
     const { word } = WordUnderCursor.getFullWord(e)
     if (!word)
       return
 
-    if (!$(e.target).closest('body')[0])
-      return // removed from DOM
-
-    const isWrappedSentence = !!$(e.target).closest('sentencewrap').length // sentence already wrapped
+    const isWrappedSentence = !!$(e.target).closest('sentencewrap').length
     if (!isWrappedSentence) {
       e.preventDefault()
       e.stopPropagation()
@@ -98,10 +91,13 @@ const trackContentClicks = () => {
       const { clicked, x, y } = getFullSentence(e)
       if (!clicked || !x || !y)
         return
-      const sentenceText = ref<string>($(clicked).text())
+      // store text
+      const sentenceText = $(clicked).text()
+      // empty node
       $(clicked).empty()
 
-      if (sentenceText.value !== '' && !!Sentence) {
+      if (sentenceText !== '' && !!Sentence) {
+        // create a new vue app for each sentence
         createApp(
           {
             extends: Sentence,
@@ -111,7 +107,7 @@ const trackContentClicks = () => {
                 return
               return {
                 ...Sentence.setup({
-                  sentence: sentenceText.value,
+                  sentence: sentenceText,
                   x,
                   y,
                   currentTabLanguage: currentTabLanguage.value,
@@ -128,27 +124,24 @@ const trackContentClicks = () => {
   })
 }
 
-watch(isEnabled, (newVal) => {
-  console.log('isEnabled:', newVal)
+watch(isEnabled, (newVal, prevVal) => {
+  if (newVal)
+    enableContentClickProxy()
+  if (prevVal === true && newVal === false)
+    window.location.reload()
 })
 
 onMessage('content.storage', async ({ data }) => {
-  console.log('received content.storage', data)
-  // updates from popup
   extensionSharedStorage.value = data
+  userLanguage.value = extensionSharedStorage.value.userStorage.language
 })
 
-onMessage('content.info', async () => {
-  return { language: currentTabLanguage.value, isEnabled: isEnabled.value }
+onMessage('content.getCurrentActiveTabLanguage', async () => {
+  return currentTabLanguage.value
 })
 
 onMessage('content.isEnabled', async ({ data }) => {
-  console.log('content.isEnabled', data)
   isEnabled.value = data.isEnabled
-  if (!isEnabled.value) {
-    // good place to reload
-    //
-  }
 })
 
 onMounted(async () => {
@@ -156,18 +149,20 @@ onMounted(async () => {
     const { currentTabLanguage: language } = await getLanguageDefaults()
     if (language)
       currentTabLanguage.value = language
-    console.log('currentTabLanguage.value', currentTabLanguage.value)
-    trackContentClicks()
-    console.log('great success!')
   }
   catch (e: any) {
-    console.error('error mount', e)
+    console.error('Error loading language extension:', e)
   }
 })
 </script>
 
 <template>
   <div />
+
+  <!-- debugging reactive -->
+  <!-- <div style="z-index:1000000" class=" w-{200px} h-{200px}4 bg-green-500 top-0 left-0 absolute">
+    extensionSharedStorage:{{ extensionSharedStorage }}
+  </div> -->
 </template>
 
 <style src="../../styles/fonts.css" />

@@ -1,4 +1,13 @@
-p,i,b,strong,h1, h2,h3,h4,h5,h6{
+.languageextensioncss p,
+.languageextensioncss i,
+.languageextensioncss b,
+.languageextensioncss strong,
+.languageextensioncss h1,
+.languageextensioncss h2,
+.languageextensioncss h3,
+.languageextensioncss h4,
+.languageextensioncss h5,
+.languageextensioncss h6{
   cursor: pointer;
   cursor: hand;
 }

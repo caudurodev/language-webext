@@ -3,9 +3,9 @@ import { sendMessage } from 'webext-bridge'
 import type Language from '../types/Language'
 import { extensionSettingsStorage, tabsInfoStorage, userStorage } from '~/logic/storage'
 
-const tabLanguage = ref('')
 const isCurrentTabEnabled = ref(false)
-const currentTabId = ref<number>()
+const currentTabId = ref(0)
+const currentTabLanguage = ref('')
 
 const languageOptions = ref<Language[]>([
   { label: 'English', code: 'en' },
@@ -29,18 +29,19 @@ const storeActiveTab = () => {
 
   if (findActiveTab())
     tabsInfoStorage.value = tabsInfoStorage.value.filter(t => t.id !== currentTabId.value)
+  console.log('storing tab as enabled?', isCurrentTabEnabled.value)
   tabsInfoStorage.value.push({
     id: currentTabId.value,
     isEnabled: isCurrentTabEnabled.value,
   })
 }
+
 watch(isCurrentTabEnabled, async (newVal) => {
-  console.log('isCurrentTabEnabled', newVal)
   storeActiveTab()
-  const activeTab = findActiveTab()
-  console.log('activeTab', activeTab)
-  console.log('isCurrentTabEnabled.value', isCurrentTabEnabled.value)
-  console.log('tabsInfoStorage.value', tabsInfoStorage.value)
+  await sendMessage('bg.storage', {
+    extensionSettingsStorage: extensionSettingsStorage.value,
+    userStorage: userStorage.value,
+  }, 'background')
   await sendMessage('bg.isCurrentTabEnabled', { isEnabled: newVal }, 'background')
 })
 
@@ -52,20 +53,16 @@ watch([extensionSettingsStorage, userStorage], async () => {
 }, { deep: true })
 
 onMounted(async () => {
-  console.log('tabsInfoStorage.value.tabs on mounted', tabsInfoStorage.value)
   currentTabId.value = await sendMessage('bg.getCurrentActiveTabId', {}, 'background')
-  console.log('currentTabId.value', currentTabId.value)
-  storeActiveTab()
+  currentTabLanguage.value = await sendMessage('bg.getCurrentActiveTabLanguage', {}, 'background')
   await sendMessage('bg.storage', {
     extensionSettingsStorage: extensionSettingsStorage.value,
     userStorage: userStorage.value,
   }, 'background')
-  // check if enabled from storage
   const activeTab = findActiveTab()
-  console.log('activeTab is', activeTab?.isEnabled)
   if (activeTab)
     isCurrentTabEnabled.value = activeTab.isEnabled
-  console.log('isCurrentTabEnabled.value', isCurrentTabEnabled.value)
+  storeActiveTab()
 })
 </script>
 
@@ -86,7 +83,7 @@ onMounted(async () => {
       Content Language
     </h3>
     <select
-      v-model="tabLanguage"
+      v-model="currentTabLanguage"
       class="w-full mb-4 p-2 bg-green-300 text-gray-600 rounded"
     >
       <option v-for="lang in languageOptions" :key="lang.code" :value="lang.code">
@@ -128,13 +125,6 @@ onMounted(async () => {
         :model-value="isCurrentTabEnabled"
         @update:model-value="isCurrentTabEnabled = $event"
       />
-    </div>
-    <div py-4 mb-4 block bg-green-400>
-      aaaextensionSettingsStorage: {{ extensionSettingsStorage }}
-    </div>
-    <br><br>
-    <div py-4>
-      isCurrentTabEnabled: {{ isCurrentTabEnabled }}
     </div>
   </main>
 </template>

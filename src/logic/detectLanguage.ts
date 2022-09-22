@@ -1,7 +1,5 @@
 import browser from 'webextension-polyfill'
 import $ from 'jquery'
-// const SERVER_URL = 'http://192.168.1.11:6565'
-// const SERVER_URL = 'https://translate.cauduro.dev'
 const SERVER_URL = 'https://libretranslate.de'
 const languageOptions = [
   { label: 'English', code: 'en' },
@@ -19,8 +17,6 @@ const detectLanguage = async () => {
     if (text && text.split(' ').length > 4 && pageText.length < 500)
       pageText += ` ${text}`
   })
-  // console.log('pageText', pageText)
-
   if (!pageText) {
     console.warn('Error reading page text')
     return
@@ -30,15 +26,16 @@ const detectLanguage = async () => {
   if (browser)
     detectLanguage = await browser.i18n.detectLanguage(pageText)
   else
-    console.log('browser detectLanguage failed')
+    console.warn('browser detectLanguage failed')
   if (
     detectLanguage
     && detectLanguage.isReliable
     && detectLanguage.languages.length
-  )
+  ) {
+    console.log('browser detectLanguage from browser', detectLanguage.languages[0])
     return detectLanguage.languages[0]
-
-  console.log('browser detectLanguage failed using API')
+  }
+  console.warn('Detect Language failed using browser API')
   return fetch(`${SERVER_URL}/detect`, {
     method: 'POST',
     body: JSON.stringify({
@@ -50,13 +47,11 @@ const detectLanguage = async () => {
       return response.json()
     })
     .then((data) => {
-      if (data && data.length) {
-        console.log('detect response', data)
+      if (data && data.length)
         return data[0]
-      }
     })
     .catch((e) => {
-      console.log('detect error ', e)
+      console.log('API detect error ', e)
       return false
     })
 }
